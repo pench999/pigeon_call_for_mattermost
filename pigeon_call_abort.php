@@ -30,7 +30,7 @@ function abortWaitingCalls() {
     // 1. calls API (GET) の URL と認証トークン、abort API の URL を設定
     $callsUrl   = "https://fairway.cloud.kompira.jp/api/apps/pigeon/calls?offset=0&limit=100";
     $abortUrl   = "https://fairway.cloud.kompira.jp/api/apps/pigeon/chain/abort";
-    $authToken  = "dafEQtWb0stuwepsjjmkEa5oUVEk8WHfZU8fs1Yy"; // 環境に合わせて書き換えてください
+    $authToken  = "token"; // 環境に合わせて書き換えてください
 
     // 2. calls API へ GET リクエストを送り、レスポンス(JSON)を取得
     $ch = curl_init($callsUrl);
