@@ -30,7 +30,7 @@ function abortWaitingCalls() {
     // 1. calls API (GET) の URL と認証トークン、abort API の URL を設定
     $callsUrl   = "https://fairway.cloud.kompira.jp/api/apps/pigeon/calls?offset=0&limit=100";
     $abortUrl   = "https://fairway.cloud.kompira.jp/api/apps/pigeon/chain/abort";
-    $authToken  = "dafEQtWb0stuwepsjjmkEa5oUVEk8WHfZU8fs1Yy"; // 環境に合わせて書き換えてください
+    $authToken  = "Nmj0J/50cCvffIL3GpJzukQ1XaLlP5STApeK3dmp"; // 環境に合わせて書き換えてください
 
     // 2. calls API へ GET リクエストを送り、レスポンス(JSON)を取得
     $ch = curl_init($callsUrl);
@@ -80,6 +80,10 @@ function abortWaitingCalls() {
     }
 
     // 5. status が "waiting" の resultId をすべて中断(POST /chain/abort)
+    //    → ログ出力を最後にまとめて行うために、結果を一時保管する
+    $abortedList = [];    // 成功した resultId
+    $failedList  = [];    // 失敗した resultId やステータスコード等
+
     foreach ($waitingResultIds as $rid) {
         $payload = json_encode(["resultId" => $rid]);
 
@@ -95,29 +99,49 @@ function abortWaitingCalls() {
         $abortResponse = curl_exec($ch);
 
         if (curl_errno($ch)) {
-            throw new Exception("cURL Error (POST abort): " . curl_error($ch));
+            // cURL自体のエラー
+            $errorMsg = curl_error($ch);
+            $failedList[] = "resultId: {$rid}, cURL error: {$errorMsg}";
+            curl_close($ch);
+            continue;
         }
 
-        // レスポンスやステータスコードのチェック(必要に応じて)
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        // ログ出力 (必要に応じて内容を変更)
-        if ($httpCode === 200 || $httpCode === 201) {
-        //  echo "Aborted call with resultId: {$rid}\n";
-        echo json_encode(
-        ["text" => "{$rid} 呼び出し待ちコールを中止しました。\n"],
-        );
+        // HTTPステータスコードで簡易的に成功/失敗を振り分け
+        if ($httpCode >= 200 && $httpCode < 300) {
+            $abortedList[] = $rid;
         } else {
-        //  echo "Failed to abort call with resultId: {$rid}, HTTP Status: {$httpCode}\n";
-        echo json_encode(
-        ["text" => "{$rid} 中止に失敗しました。HTTP Status: {$httpCode}\n"],
-        );
-            // 実際にはエラー処理を追加しても良いでしょう
+            $failedList[] = "resultId: {$rid}, HTTP status: {$httpCode}";
         }
     }
+
+    // 6. 全ての abort リクエストを完了したので、結果をまとめて JSON 出力
+    $logs = "";
+
+    if (!empty($abortedList)) {
+        $logs .= "以下の resultId で abort に成功しました:\n";
+        foreach ($abortedList as $id) {
+            $logs .= "  - {$id}\n";
+        }
+    }
+    if (!empty($failedList)) {
+        $logs .= "\n以下の resultId で abort に失敗しました:\n";
+        foreach ($failedList as $info) {
+            $logs .= "  - {$info}\n";
+        }
+    }
+
+    // JSON でキーが "text" のみになるように整形
+    $output = [
+        "text" => $logs
+    ];
+    // 日本語をユニコードエスケープしない (JSON_UNESCAPED_UNICODE) なら画面上は日本語が可読形式で表示される
+    echo json_encode($output, JSON_UNESCAPED_UNICODE) . PHP_EOL;
 }
 
 // 実行
 abortWaitingCalls();
+
 
